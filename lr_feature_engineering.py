@@ -6,11 +6,12 @@ specific to the Logistic Regression model, including encoding categorical featur
 standardizing numerical features, and calculating feature importance. It then selects
 the most important features based on a defined threshold. The final feature set
 and the target variable are saved to separate CSV files, which serve as input
-for the model training script.
+for the model training script. It also calculates and saves the correlation matrix
+between features and the target for analysis.
 
 Corresponds to Feature Engineering (Section 5.4), Scaling (Section 5.4.5),
-Feature Importance Analysis (Section 5.4.6), and Feature Selection steps in
-Chapter 5 of the thesis.
+Feature Importance Analysis (Section 5.4.6), Feature Selection, and Correlation Analysis
+(Section 5.10.3) steps in Chapter 5 of the thesis.
 """
 
 import pandas as pd
@@ -29,10 +30,14 @@ INPUT_CSV_PATH = "nominal_features_cleaned.csv"
 OUTPUT_FEATURES_CSV = "lr_final_features.csv"
 OUTPUT_TARGET_CSV = "lr_target.csv"
 FEATURE_IMPORTANCE_CSV = "LR_feature_importance_all_features.csv"
+CORRELATION_MATRIX_CSV = "feature_correlation_matrix.csv" # For correlation matrix output
 
 # Define the threshold for feature selection based on absolute importance (Section 5.4.6, Table 9 Step 8)
 # Features with absolute coefficient value below this threshold are removed.
 IMPORTANCE_THRESHOLD = 0.15
+
+# Configuration for the temporary initial model fit used only for feature importance calculation
+MAX_ITER_FOR_IMPORTANCE = 500 # Max iterations for the initial model to calculate coefficients
 
 # --- Main Processing Flow ---
 
@@ -48,17 +53,10 @@ if __name__ == "__main__":
 
     # --- Feature Engineering Steps (Based on Section 5.4 and Table 9 Step 8 logic) ---
 
-    # Drop columns not used as features for LR (IDs, Lemmas, Nominal Head UPOS)
-    # IDs and Lemmas are dropped as they don't contribute linguistic information (Section 5.4.1).
-    # Nominal Head UPOS was removed as it did not significantly contribute (Section 5.4.1).
-    cols_to_drop_non_features = ["nominal_head_id", "dependent_id", "nominal_head_lemma", "dependent_lemma", "nominal_head_upos"]
-    nominals_df.drop(columns=[col for col in cols_to_drop_non_features if col in nominals_df.columns], inplace=True, errors='ignore')
-    print("Dropped non-feature columns (IDs, Lemmas, Nominal Head UPOS).")
-
-
     # Encoding Word Position as a Binary Feature (Section 5.4.2)
     # The 'position' column ('before' or 'after') is converted to a numerical binary feature.
     # Mapping: 'before' -> 1, 'after' -> 2, as described in the thesis text.
+    # Do this early as it's used in correlation and the main feature set.
     if "position" in nominals_df.columns:
         nominals_df['position_numeric'] = nominals_df['position'].apply(lambda x: 1 if x == 'before' else 2)
         nominals_df.drop(columns=["position"], inplace=True, errors='ignore') # Drop the original text column
@@ -68,51 +66,143 @@ if __name__ == "__main__":
         # The model will proceed without this feature if it's not present
 
 
-    # One-Hot Encoding Categorical Features (Section 5.4.3 and Table 11)
-    # Converts specified categorical columns into multiple binary columns.
-    categorical_features_to_ohe = ["dependent_deprel", "dependent_upos", "source_file"]
+    # --- Compute and Save Correlation Matrix (Section 5.10.3, Table 10) ---
+    # Calculate correlation of all relevant features with the target variable.
+    # This needs features *before* the main selection step.
+    # The OHE needs to be applied for categorical features for correlation calculation.
 
-    # Identify categorical columns present in the DataFrame for OHE
-    categorical_features_present_for_ohe = [col for col in categorical_features_to_ohe if col in nominals_df.columns]
+    # Define features needed for correlation calculation (including original categories for OHE)
+    corr_features_list = ["distance", "num_dependents_nominal", "num_dependents_dependent",
+                          "is_verbal", "nominal_head_upos", # Keep original nominal head upos for this table
+                          "dependent_upos", "dependent_deprel", "source_file"] # Keep original dependent features for OHE
+
+    # Add position_numeric if it was created
+    if 'position_numeric' in nominals_df.columns:
+         corr_features_list.append('position_numeric')
+
+    # Filter to keep only columns that exist in the dataframe
+    corr_cols_present = [col for col in corr_features_list if col in nominals_df.columns]
+
+    # Create a temporary DataFrame for correlation calculation
+    temp_df_for_corr = nominals_df[corr_cols_present + ['ezafe_label']].copy() # Include target and copy
+
+    # One-Hot Encode the categorical features for the correlation matrix table (Section 5.10.3, Table 10 lists OHE features)
+    corr_categorical_features_to_ohe = ["dependent_deprel", "dependent_upos", "source_file", "nominal_head_upos"] # Include head upos for this table
+    corr_categorical_features_present = [col for col in corr_categorical_features_to_ohe if col in temp_df_for_corr.columns]
+
+    if corr_categorical_features_present:
+        corr_encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+        corr_encoded_features = corr_encoder.fit_transform(temp_df_for_corr[corr_categorical_features_present])
+        corr_encoded_columns = corr_encoder.get_feature_names_out(corr_categorical_features_present)
+        corr_encoded_df = pd.DataFrame(corr_encoded_features, columns=corr_encoded_columns, index=temp_df_for_corr.index)
+        # Drop original categorical columns from temp df and concatenate OHE ones
+        temp_df_for_corr = pd.concat([temp_df_for_corr.drop(columns=corr_categorical_features_present), corr_encoded_df], axis=1)
+        # print(f"One-hot encoded {corr_categorical_features_present} for correlation calculation.") # Less verbose
+
+    # Ensure all columns in temp_df_for_corr used in correlation are numeric
+    non_numeric_corr_cols = temp_df_for_corr.select_dtypes(exclude=['number']).columns.tolist()
+    if non_numeric_corr_cols:
+        print(f"Warning: Non-numeric columns found in temporary correlation df: {non_numeric_corr_cols}")
+        # Attempt to convert them to numeric if possible, otherwise drop them for corr calculation
+        for col in non_numeric_corr_cols:
+            try:
+                temp_df_for_corr[col] = pd.to_numeric(temp_df_for_corr[col])
+            except (ValueError, TypeError):
+                print(f"Could not convert column '{col}' to numeric for correlation. Dropping.")
+                temp_df_for_corr.drop(columns=[col], inplace=True)
+
+
+    # Calculate correlation matrix for the relevant columns in the temporary dataframe
+    if not temp_df_for_corr.empty and 'ezafe_label' in temp_df_for_corr.columns:
+        correlation_matrix = temp_df_for_corr.corr()
+
+        # Extract correlation with the target variable 'ezafe_label' and sort
+        correlation_with_target = correlation_matrix['ezafe_label'].sort_values(ascending=False)
+
+        # Save to CSV (Section 5.10.3 references Table 10 which shows this)
+        correlation_with_target_df = correlation_with_target.reset_index()
+        correlation_with_target_df.columns = ["Feature", "Correlation with ezafe_label"]
+        try:
+            correlation_with_target_df.to_csv(CORRELATION_MATRIX_CSV, index=False)
+            print(f"Correlation matrix with target saved to '{CORRELATION_MATRIX_CSV}'.")
+        except Exception as e:
+            print(f"Error saving correlation matrix CSV: {e}")
+    else:
+        print("Warning: Temporary DataFrame is empty or missing 'ezafe_label' for correlation calculation.")
+
+    del temp_df_for_corr # Clean up temporary DataFrame
+
+
+    # --- Continue with Feature Engineering for the Model ---
+    # Drop columns not used as features for LR (IDs, Lemmata, Nominal Head UPOS) for the main feature set X
+    # Nominal Head UPOS is dropped as it did not significantly contribute to the model (Section 5.4.1).
+    cols_to_drop_non_features_main = ["nominal_head_id", "dependent_id", "nominal_head_lemma", "dependent_lemma", "nominal_head_upos"]
+    nominals_df.drop(columns=[col for col in cols_to_drop_non_features_main if col in nominals_df.columns], inplace=True, errors='ignore')
+    print("Dropped non-feature columns for model input (IDs, Lemmata, Nominal Head UPOS).")
+
+
+    # One-Hot Encoding Categorical Features for the Model (Section 5.4.3 and Table 11)
+    # Converts specified categorical columns into multiple binary columns.
+    # Note: nominal_head_upos is NOT included here, only for the correlation table above.
+    categorical_features_to_ohe_main = ["dependent_deprel", "dependent_upos", "source_file"]
+
+    # Identify categorical columns present in the DataFrame for OHE for the model
+    categorical_features_present_for_ohe_main = [col for col in categorical_features_to_ohe_main if col in nominals_df.columns]
 
     encoded_df = pd.DataFrame(index=nominals_df.index) # Initialize an empty DataFrame for encoded features
 
-    if categorical_features_present_for_ohe:
+    if categorical_features_present_for_ohe_main:
         # Use OneHotEncoder
         encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
-        encoded_features = encoder.fit_transform(nominals_df[categorical_features_present_for_ohe])
-        encoded_columns = encoder.get_feature_names_out(categorical_features_present_for_ohe)
+        encoded_features = encoder.fit_transform(nominals_df[categorical_features_present_for_ohe_main])
+        encoded_columns = encoder.get_feature_names_out(categorical_features_present_for_ohe_main)
 
         # Create DataFrame for encoded features
         encoded_df = pd.DataFrame(encoded_features, columns=encoded_columns, index=nominals_df.index)
-        print(f"One-hot encoded {categorical_features_present_for_ohe}.")
+        print(f"One-hot encoded {categorical_features_present_for_ohe_main} for model input.")
     else:
-         print("Warning: No specified categorical features found for one-hot encoding.")
+         print("Warning: No specified categorical features found for one-hot encoding for model input.")
+
 
     # Drop the original categorical columns from the main DataFrame, as they are replaced by OHE columns.
-    cols_to_drop_original_categorical = [col for col in categorical_features_present_for_ohe if col in nominals_df.columns]
-    nominals_df.drop(columns=cols_to_drop_original_categorical, inplace=True, errors='ignore')
-    # print(f"Dropped original categorical columns: {cols_to_drop_original_categorical}.") # Less verbose print
+    cols_to_drop_original_categorical_main = [col for col in categorical_features_present_for_ohe_main if col in nominals_df.columns]
+    nominals_df.drop(columns=cols_to_drop_original_categorical_main, inplace=True, errors='ignore')
 
 
     # Generating Interaction Features (Section 5.4.4)
     # Explicit interaction features were excluded from the final LR model
     # due to multicollinearity issues identified in Section 5.8 and Table 7.
-    # Therefore, this step is omitted here for the final feature set.
+    # Therefore, this step is omitted here for the final feature set used by the model.
+
+
+    # Define list of numerical features present for scaling.
+    # These are the columns that are not one-hot encoded or binary (is_verbal)
+    actual_numeric_features_list = ["distance", "num_dependents_nominal", "num_dependents_dependent"]
+    # Add position_numeric if it exists in the DataFrame
+    if 'position_numeric' in nominals_df.columns:
+        actual_numeric_features_list.append('position_numeric')
+
+    # Ensure the numerical columns actually exist in nominals_df
+    actual_numeric_features = [col for col in actual_numeric_features_list if col in nominals_df.columns]
+
+    # Define list of binary features present
+    actual_binary_features = ["is_verbal"]
+    actual_binary_features = [col for col in actual_binary_features if col in nominals_df.columns]
 
 
     # Combine all prepared feature columns (numerical, binary, and one-hot encoded).
     # Exclude the target variable 'ezafe_label'.
-    feature_cols_in_nominals_df = [col for col in nominals_df.columns if col != 'ezafe_label']
+    feature_cols_in_nominals_df = actual_numeric_features + actual_binary_features # Numerical and binary features from nominals_df
 
-    # Concatenate columns from nominals_df (containing numerical/binary features) and the encoded_df.
+    # Concatenate columns from nominals_df and the encoded_df.
     X_combined = pd.concat([nominals_df[feature_cols_in_nominals_df], encoded_df], axis=1)
     y = nominals_df["ezafe_label"] # Target variable
 
-    # Final check to ensure all feature columns are numerical before scaling/fitting.
+
+    # Final check to ensure all feature columns in X_combined are numerical.
     non_numeric_cols_in_X = X_combined.select_dtypes(exclude=['number']).columns.tolist()
     if non_numeric_cols_in_X:
-        print(f"Error: Non-numeric columns still present in feature set X: {non_numeric_cols_in_X}")
+        print(f"Error: Non-numeric columns still present in feature set X before scaling: {non_numeric_cols_in_X}")
         # Print data types to aid debugging
         print(X_combined[non_numeric_cols_in_X].dtypes)
         exit() # Stop execution if non-numeric data persists
@@ -120,17 +210,6 @@ if __name__ == "__main__":
 
     X = X_combined # The complete feature set before scaling and selection
     print(f"\nCombined all features. Shape before scaling/selection: {X.shape}")
-
-
-    # Define list of actual numerical features present for scaling.
-    # These are the columns that are not one-hot encoded and represent quantities or distances.
-    actual_numeric_features_list = ["distance", "num_dependents_nominal", "num_dependents_dependent"]
-    # Add position_numeric if it exists in the DataFrame
-    if 'position_numeric' in X.columns:
-        actual_numeric_features_list.append('position_numeric')
-
-    # Ensure the numerical columns actually exist in X before attempting to scale them.
-    actual_numeric_features = [col for col in actual_numeric_features_list if col in X.columns]
 
 
     # Standardizing Numerical Features using RobustScaler (Section 5.4.5, Table 9 Step 4)
@@ -158,12 +237,8 @@ if __name__ == "__main__":
 
     # Compute absolute importance from model coefficients (Section 5.4.6).
     # For binary classification, the coefficients indicate feature influence on the probability.
-    if initial_model_for_selection.coef_.shape[0] > 1:
-         # Handle potential multi-class if target mapping was unexpected, though LR is binary here.
-         print("Warning: Initial model fit resulted in multi-class coefficients. Using coefficients for class 1.")
-         coef_values = initial_model_for_selection.coef_[0]
-    else:
-         coef_values = initial_model_for_selection.coef_.flatten()
+    # coef_ has shape (1, n_features) for binary classification.
+    coef_values = initial_model_for_selection.coef_.flatten()
 
     feature_importance = pd.DataFrame({
         "Feature": X.columns,
@@ -199,9 +274,3 @@ if __name__ == "__main__":
         print(f"\nFinal feature set and target saved to '{OUTPUT_FEATURES_CSV}' and '{OUTPUT_TARGET_CSV}'.")
     except Exception as e:
          print(f"Error saving final feature/target CSVs: {e}")
-
-
-# --- Configuration for Initial Model Fit (Needed for MAX_ITER_FOR_IMPORTANCE) ---
-# This configuration is specifically for the temporary model used to calculate initial feature importance.
-# It's placed after the main block for organizational clarity, but needed for MAX_ITER_FOR_IMPORTANCE definition.
-MAX_ITER_FOR_IMPORTANCE = 500 # Max iterations for the initial model to calculate coefficients
