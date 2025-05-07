@@ -15,7 +15,8 @@ This output file serves as the input for subsequent feature engineering and
 model training stages.
 
 Corresponds to the data loading and initial preprocessing steps described in
-Chapter 4 and Section 5.3 of the thesis.
+Chapter 4 and Section 5.3 of the thesis. One feature was added during the error analysis and feature evaluation step, namely source_file.
+It showed that the results from the model are fairly stable and improve with the consideration of the source_file differences.
 """
 
 import os
@@ -175,7 +176,7 @@ def process_nominal_heads(token_dicts_list, source_file):
                     'num_dependents_dependent': num_dependents_of_dependent,
                     'ezafe_label': ezafe_label, # Target variable
                     'is_verbal': is_verbal, # Feature
-                    'source_file': source_file # Feature
+                    'source_file': source_file # Feature added after step 8 (Table 9), results in Table 11.
                 })
 
     return nominal_data
@@ -224,11 +225,11 @@ def process_conllu_file(file_path):
                     # Store token data as a dictionary
                     token_representation = {
                          "id": token_id,
-                         "form": token_data.get("form"), # Use .get for safety
+                         "form": token_data.get("form"),
                          "lemma": token_data.get("lemma"),
                          "upos": token_data.get("upos"),
                          "xpos": token_data.get("xpos"),
-                         "feats": token_data.get("feats", {}), # Default to empty dict
+                         "feats": token_data.get("feats", {}), # Default to empty dict for morphological features
                          "head": head_id,
                          "deprel": corrected_deprel, # Use corrected deprel
                          "deps": token_data.get("deps"),
@@ -241,7 +242,6 @@ def process_conllu_file(file_path):
 
     except Exception as e:
         print(f"Error processing file {file_path}: {e}")
-        # Consider adding more detailed logging here if needed for debugging
     return nominal_data_list
 
 # --- Main Processing Flow ---
@@ -260,11 +260,9 @@ if __name__ == "__main__":
         # Use sorted listdir for consistent processing order
         for filename in sorted(os.listdir(CONLLU_FOLDER)):
             if filename.endswith(".conllu"):
-                # print(f"Processing: {filename}") # Uncomment for more detailed file-by-file progress
                 file_path = os.path.join(CONLLU_FOLDER, filename)
                 nominal_data_from_file = process_conllu_file(file_path)
                 all_nominal_rows.extend(nominal_data_from_file)
-                # print(f"Finished {filename}, extracted {len(nominal_data_from_file)} nominal phrase features") # Uncomment
 
         # Create DataFrame from collected data
         nominals_df = pd.DataFrame(all_nominal_rows)
@@ -278,7 +276,6 @@ if __name__ == "__main__":
 
             # Adjust numerical values to prevent zeros if necessary (Section 5.3.2)
             nominals_df = adjust_numerical_values(nominals_df)
-            # print("Adjusted numerical columns to prevent zeros if necessary.") # Less verbose print
 
             # Save the cleaned nominal features to CSV (Section 6.4 mentions saving to CSV)
             try:
