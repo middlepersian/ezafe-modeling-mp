@@ -124,7 +124,7 @@ The results presented in the output cells of the notebooks are consistent with t
 
 ### Tools and Assistance
 
-Some comments and docstrings within the Python scripts and Jupyter Notebooks were generated with the assistance of an AI language model (OpenAI). All AI-generated content has been thoroughly reviewed, checked for accuracy, and approved by the author to ensure it correctly reflects the implemented methodology and analysis. The core logic and design of the code are the author's original work.
+Some comments and docstrings in the read-me file and within the Python scripts and Jupyter Notebooks were generated with the assistance of an AI language model (OpenAI). All AI-generated content has been thoroughly reviewed, checked for accuracy, and approved by the author to ensure it correctly reflects the implemented methodology and analysis. The core logic and design of the code are the author's original work.
 
 ## License
 
