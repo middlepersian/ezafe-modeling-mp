@@ -1,4 +1,9 @@
 # Filename: lr_feature_engineering.py
+# Author: Raha Musavi
+# Matrikelnummer: 08022255354
+# Thesis: Modeling the Presence and the Classification of Ezafe in Middle Persian Nominal Phrases 
+# Date: 01 May 2025
+
 
 """
 This script loads the cleaned nominal phrase data CSV, performs feature engineering
