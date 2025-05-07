@@ -31,7 +31,7 @@ warnings.filterwarnings("ignore")
 
 # --- Configuration ---
 # Define input and output file paths.
-INPUT_CSV_PATH = "nominal_features_cleaned.csv"
+INPUT_CSV_PATH = "np_inputs.csv"
 OUTPUT_FEATURES_CSV = "lr_final_features.csv"
 OUTPUT_TARGET_CSV = "lr_target.csv"
 FEATURE_IMPORTANCE_CSV = "LR_feature_importance_all_features.csv"
