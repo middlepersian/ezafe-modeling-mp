@@ -32,7 +32,7 @@ warnings.filterwarnings("ignore")
 CONLLU_FOLDER = r'C:\Users\rahaa\Dropbox\MPCD\conllus_with_erros' # <--- *** UPDATE THIS PATH ***
 
 # Define the output path for the cleaned nominal features CSV file.
-OUTPUT_CSV_PATH = "nominal_features_cleaned.csv"
+OUTPUT_CSV_PATH = "np_inputs.csv"
 
 # Define a dictionary for standardizing dependency labels to correct variations (Section 5.3.5, Table B4 footnote)
 standardized_deprels = {
