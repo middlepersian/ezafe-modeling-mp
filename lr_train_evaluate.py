@@ -15,6 +15,8 @@ and saves the trained model to a file.
 
 Corresponds to Handling Class Imbalance (Section 5.5), Hyperparameter Tuning (Section 5.6),
 Model Training (Section 5.7), and Evaluation (Section 5.9, 5.10) in Chapter 5 of the thesis.
+
+Finally the results from this model are reflected in Table 11 of the thesis.
 """
 
 import pandas as pd
