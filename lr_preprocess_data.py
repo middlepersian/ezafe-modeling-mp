@@ -1,5 +1,10 @@
 # Filename: lr_preprocess_data.py
 
+# Author: Raha Musavi
+# Matrikelnummer: 08022255354
+# Thesis: Modeling the Presence and the Classification of Ezafe in Middle Persian Nominal Phrases 
+# Date: 01 May 2025
+
 """
 This script processes raw linguistic data in CoNLL-U format.
 It reads files from a specified directory, parses the data, and extracts
