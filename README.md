@@ -62,15 +62,22 @@ The analysis pipeline involves multiple sequential Python scripts located in the
     ```bash
     python src/lr_preprocess_data.py
     ```
-    *   This script reads the raw `.conllu` files, cleans and extracts initial features, and saves the result to `data/nominal_features_cleaned.csv`.
-    *   **Note:** If `data/nominal_features_cleaned.csv` is already included in the repository and you intend to use it, you can skip this step.
-
+    *   This script reads the raw `.conllu` files, cleans and extracts initial features, and saves the result to `data/lr_np_inputs.csv`.
+    *   **Note:** If `data/n.csv` is already included in the repository and you intend to use it, you can skip this step.
+    
 2.  **Logistic Regression Pipeline:**
     *   **Feature Engineering and Selection:**
         ```bash
         python src/lr_feature_engineering.py
+        
         ```
-        *   This script loads `data/nominal_features_cleaned.csv`, performs LR-specific feature processing, selects features, and saves the final LR feature set (`data/lr_final_features.csv`) and target (`data/lr_target.csv`), as well as LR correlation and importance results (`results/`).
+3.  **Random Forest Pipeline:**
+    *   **Feature Extraction (RF Specific):**
+        ```bash
+        python src/rf_feature_extraction.py
+        ```
+        *   This script loads `data/rf_np_inputs.csv`, performs RF-specific feature extraction (including structural/complexity features, creating the combined target), and saves the RF feature set (`data/rf_features.csv`) and combined target (`data/rf_combined_target.csv`).
+        *   **Note on `is_verbal` Feature:** Due to the filtering of clausal dependents (Section 6.3.1) to focus on nominal phrases, the `is_verbal` feature in the extracted dataset is expected to have no instances marked as true (1). This feature is intentionally included to verify the effectiveness of the filtering process and to ensure that the machine learning pipeline correctly handles features with minimal or zero variance.
     *   **Model Training and Evaluation:**
         ```bash
         python src/lr_train_evaluate.py
