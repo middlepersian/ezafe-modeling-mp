@@ -28,9 +28,6 @@ from sklearn.metrics import classification_report, accuracy_score
 from imblearn.over_sampling import RandomOverSampler # Requires: pip install imblearn
 import os
 import joblib # Requires: pip install joblib # Used for saving/loading the trained model
-# Import plotting libraries if you uncomment the plotting code later
-# import matplotlib.pyplot as plt
-# import seaborn as sns
 
 
 # Suppress warnings (e.g., from specific solvers)
@@ -46,11 +43,11 @@ OUTPUT_MODEL_PATH = "final_logistic_regression_model.pkl"
 # Define model training parameters (Section 5.2, 5.7)
 MAX_ITER = 500 # Maximum number of iterations for the solver to converge.
 
-# Define data splitting parameters (Section 5.9, Table 9 Step 8)
+# Define data splitting parameters (Section 5.9, unchanged from Table 9, step 8)
 TEST_SIZE = 0.3 # Proportion of the dataset to include in the test split.
 RANDOM_STATE = 42 # Seed for the random number generator to ensure reproducibility of splits.
 
-# Define Hyperparameter Grid for GridSearchCV (Section 5.6, Table 9 Step 8)
+# Define Hyperparameter Grid for GridSearchCV (Section 5.6, unchanged from Table 9 Step 8)
 # This grid specifies the range of hyperparameters to search over.
 param_grid = {
     'C': [0.1, 1, 10, 100], # Regularization strength values to test. Lower C means stronger regularization.
@@ -58,7 +55,7 @@ param_grid = {
 }
 
 # Define Cross-Validation strategy parameters (Section 5.6, 5.9)
-CV_FOLDS = 10 # Number of folds for cross-validation during grid search (Table 9 Step 8).
+CV_FOLDS = 10 # Number of folds for cross-validation during grid search (unchanged from Table 9 Step 8).
 CV_SHUFFLE = True # Whether to shuffle the data before splitting into folds. Recommended with random_state.
 
 # --- Main Processing Flow ---
@@ -71,13 +68,13 @@ if __name__ == "__main__":
         exit()
 
     X = pd.read_csv(INPUT_FEATURES_CSV)
-    y = pd.read_csv(INPUT_TARGET_CSV).squeeze() # Use squeeze() to get a pandas Series for the target variable
+    y = pd.read_csv(INPUT_TARGET_CSV).squeeze() #squeeze() to get a pandas Series for the target variable
 
     print(f"Loaded final features (X) shape: {X.shape}")
     print(f"Loaded target (y) shape: {y.shape}")
 
 
-    # Handle Class Imbalance using RandomOverSampler (Section 5.5, Table 9 Step 8)
+    # Handle Class Imbalance using RandomOverSampler (Section 5.5, unchanged from Table 9 Step 8)
     # Randomly samples the minority class with replacement to match the number
     # of samples in the majority class, balancing the dataset for training.
     oversampler = RandomOverSampler(random_state=RANDOM_STATE)
@@ -86,7 +83,7 @@ if __name__ == "__main__":
     print(f"Resampled target distribution:\n{y_resampled.value_counts()}")
 
 
-    # Split the resampled data into training and test sets (Section 5.9, Table 9 Step 8)
+    # Split the resampled data into training and test sets (Section 5.9, unchanged from Table 9 Step 8) (as it has proved to render better results than only on the train set).
     # A 70-30 split is used. Stratified splitting ensures that the proportion
     # of target classes is the same in both training and testing sets.
     X_train, X_test, y_train, y_test = train_test_split(
@@ -120,7 +117,7 @@ if __name__ == "__main__":
         estimator=model,
         param_grid=param_grid,
         cv=cv_strategy, # Use the defined CV strategy
-        n_jobs=-1, # Use all available CPU cores for parallel processing
+        n_jobs=-1, # Uses all available CPU cores for parallel processing
         verbose=2, # Print progress updates during the search
         refit=True # Retrain the best model on the full training data after the search
     )
@@ -133,7 +130,7 @@ if __name__ == "__main__":
     print(f"\nBest parameters found by GridSearchCV: {grid_search.best_params_}")
     print(f"Best cross-validation mean score: {grid_search.best_score_}")
 
-    # Evaluate the best model on the unseen test set (Section 5.9, 5.10)
+    # Evaluate the best model on the unseen test set (unchanged from Section 5.9, 5.10)
     # Get the best model found during the grid search.
     best_model = grid_search.best_estimator_
     # Make predictions on the test data.
@@ -142,7 +139,7 @@ if __name__ == "__main__":
     print("\n--- Test Set Evaluation ---")
     # Calculate and print overall accuracy.
     print("Accuracy:", accuracy_score(y_test, y_pred))
-    # Print the classification report showing precision, recall, f1-score for each class (Section 5.9).
+    # Print the classification report showing precision, recall, f1-score for each class (Table 11).
     print("Classification Report:\n", classification_report(y_test, y_pred))
 
     # --- Save the trained model ---
