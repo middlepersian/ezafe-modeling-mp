@@ -3,7 +3,9 @@
 This repository contains the code and analysis scripts developed for the Master's thesis "Modeling the Presence and the Classification of Ezafe in Middle Persian Nominal Phrases".
 
 **Author:** Raha Musavi
+
 **Matrikelnummer:** 108022255354
+
 **Thesis Submission Date:** 01 May 2025
 
 ## Project Description
