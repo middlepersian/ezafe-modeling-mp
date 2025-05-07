@@ -37,7 +37,7 @@ OUTPUT_TARGET_CSV = "lr_target.csv"
 FEATURE_IMPORTANCE_CSV = "LR_feature_importance_all_features.csv"
 CORRELATION_MATRIX_CSV = "feature_correlation_matrix.csv" # For correlation matrix output
 
-# Define the threshold for feature selection based on absolute importance (Section 5.4.6, Table 9 Step 8)
+# Define the threshold for feature selection based on absolute importance (Section 5.4.6, Table 11)
 # Features with absolute coefficient value below this threshold are removed.
 IMPORTANCE_THRESHOLD = 0.15
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     nominals_df = pd.read_csv(INPUT_CSV_PATH)
     print(f"Loaded data from {INPUT_CSV_PATH}. Shape: {nominals_df.shape}")
 
-    # --- Feature Engineering Steps (Based on Section 5.4 and Table 9 Step 8 logic) ---
+    # --- Feature Engineering Steps (Based on Section 5.4 and Table 11 logic, basically one step after Table 9, step 8) ---
 
     # Encoding Word Position as a Binary Feature (Section 5.4.2)
     # The 'position' column ('before' or 'after') is converted to a numerical binary feature.
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                           "is_verbal", "nominal_head_upos", # Keep original nominal head upos for this table
                           "dependent_upos", "dependent_deprel", "source_file"] # Keep original dependent features for OHE
 
-    # Add position_numeric if it was created
+    # Add position_numeric when created
     if 'position_numeric' in nominals_df.columns:
          corr_features_list.append('position_numeric')
 
@@ -102,7 +102,6 @@ if __name__ == "__main__":
         corr_encoded_df = pd.DataFrame(corr_encoded_features, columns=corr_encoded_columns, index=temp_df_for_corr.index)
         # Drop original categorical columns from temp df and concatenate OHE ones
         temp_df_for_corr = pd.concat([temp_df_for_corr.drop(columns=corr_categorical_features_present), corr_encoded_df], axis=1)
-        # print(f"One-hot encoded {corr_categorical_features_present} for correlation calculation.") # Less verbose
 
     # Ensure all columns in temp_df_for_corr used in correlation are numeric
     non_numeric_corr_cols = temp_df_for_corr.select_dtypes(exclude=['number']).columns.tolist()
