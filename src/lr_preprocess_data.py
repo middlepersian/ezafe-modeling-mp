@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 # --- Configuration ---
 # Define the folder containing the raw CoNLL-U files.
 # This path must be updated to reflect the actual location of the data files.
-CONLLU_FOLDER = r'C:\Users\rahaa\Dropbox\MPCD\conllus_with_erros' # <--- *** UPDATE THIS PATH ***
+CONLLU_FOLDER = cd path/to/your/project # <--- *** UPDATE THIS PATH ***
 
 # Define the output path for the cleaned nominal features CSV file.
 OUTPUT_CSV_PATH = "np_inputs.csv"
