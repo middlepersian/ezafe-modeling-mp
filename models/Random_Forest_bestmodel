@@ -16,7 +16,7 @@ import joblib
 
 def main():
     # Load dataset
-    df = pd.read_csv("rf_input.csv")
+    df = pd.read_csv("rf_inputs.csv")
          
     # Step 1: Encode categorical features
     categorical_cols = ['dependent_upos', 'dependent_deprel', 'nominal_head_deprel', 
@@ -34,7 +34,7 @@ def main():
     le_ezafe = LabelEncoder()
     df['ezafe_label'] = le_ezafe.fit_transform(df['ezafe_label'])
 
-    # Create a combined target label
+    # Create a combined target label for getting more classes
     df['combined_label'] = df['ezafe_label'].astype(str) + "_" + df['position'].astype(str)
 
     # Encode the new combined label
