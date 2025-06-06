@@ -1,0 +1,132 @@
+#model 1:
+#combined target labels to get more classes:
+import os 
+import traceback
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from conllu import parse_incr
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, RandomizedSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import classification_report as sklearn_classification_report, confusion_matrix
+import joblib
+
+def main():
+    # Load dataset
+    df = pd.read_csv("nonclausal-np_features_encoded.csv")
+         
+    # Step 1: Encode categorical features
+    categorical_cols = ['dependent_upos', 'dependent_deprel', 'nominal_head_deprel', 
+                        'np_deprel_pattern', 'head_number', 'source_file', 'nominal_head_upos']
+
+    # LabelEncoder for each categorical column
+    label_encoders = {col: LabelEncoder() for col in categorical_cols}
+
+    # Loop through each column and apply label encoding
+    for col in categorical_cols:
+        df[col] = df[col].astype(str).fillna("unknown")  
+        df[col] = label_encoders[col].fit_transform(df[col])  
+
+    # Step 2: Encode target variables
+    le_ezafe = LabelEncoder()
+    df['ezafe_label'] = le_ezafe.fit_transform(df['ezafe_label'])
+
+    # Create a combined target label
+    df['combined_label'] = df['ezafe_label'].astype(str) + "_" + df['position'].astype(str)
+
+    # Encode the new combined label
+    le_combined = LabelEncoder()
+    df['combined_label'] = le_combined.fit_transform(df['combined_label'])
+
+    # Step 3: Define features (X) and target (y)
+    X = df.drop(columns=['nominal_head_id', 'nominal_head_form', 'dependent_id', 'dependent_form', 
+                         'ezafe_label', 'position', 'combined_label'])  # Remove old target columns
+    y = df['combined_label']  # Use combined label as the target
+
+    # Step 4: Ensure all features are numeric
+    for col in X.columns:
+        if X[col].dtype == 'object':  
+            print(f"Column {col} has non-numeric values, converting to numeric.")
+            X[col] = pd.to_numeric(X[col], errors='coerce')
+            X[col] = X[col].fillna(-1)  
+
+    # Step 5: Handle class imbalance using Random Oversampling
+    ros = RandomOverSampler(sampling_strategy='auto', random_state=42)
+    X_resampled, y_resampled = ros.fit_resample(X, y)
+
+    # Step 6: Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_resampled, y_resampled, test_size=0.2, random_state=42, stratify=y_resampled
+    )
+
+    # Step 7: Hyperparameter tuning using RandomizedSearchCV
+    param_dist = {
+        'n_estimators': [100, 200, 300],
+        'max_depth': [10, 15, 20, None],
+        'min_samples_split': [2, 5, 10],
+        'class_weight': ['balanced', None]
+    }
+
+    random_search = RandomizedSearchCV(
+        RandomForestClassifier(random_state=42), 
+        param_distributions=param_dist, 
+        n_iter=10,  
+        cv=5,  
+        random_state=42
+    )
+
+    # Fit the model
+    random_search.fit(X_train, y_train)
+
+    # Best parameters
+    print(f"Best parameters: {random_search.best_params_}")
+
+    # Use best model
+    best_model = random_search.best_estimator_
+
+    # Step 8: Evaluate the model
+    y_pred = best_model.predict(X_test)
+    print(sklearn_classification_report(y_test, y_pred, zero_division='warn', digits=4))
+
+ 
+
+    # Step 9: Confusion Matrix with human-readable labels
+
+    # First, decode class labels back to their original "ezafe_position" strings
+    decoded_class_labels = le_combined.inverse_transform(best_model.classes_)
+
+    # Map the decoded labels to more human-readable labels
+    label_mapping = {
+        "0_1": "No Ezafe & Head Initial",
+        "0_2": "No Ezafe & Head Final",
+        "1_1": "With Ezafe & Head Initial",
+        "1_2": "With Ezafe & Head Final"
+    }
+
+    readable_labels = [label_mapping.get(label, label) for label in decoded_class_labels]
+
+    # Generate the confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+
+    # Plotting the confusion matrix
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap="cividis",
+                xticklabels=readable_labels, yticklabels=readable_labels)
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix of the Best Model')
+    plt.xticks(rotation=0, fontsize=8)
+    plt.yticks(rotation=0, fontsize=8)
+    plt.tight_layout()
+    plt.show()
+
+
+    # Save model
+    joblib.dump(best_model, 'random_forest_model-1.pkl')
+    
+# Run the script
+if __name__ == "__main__":
+    main()
