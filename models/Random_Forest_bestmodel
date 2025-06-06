@@ -1,4 +1,4 @@
-#model 1:
+#best_model
 #combined target labels to get more classes:
 import os 
 import traceback
