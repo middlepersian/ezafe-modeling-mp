@@ -16,7 +16,7 @@ import joblib
 
 def main():
     # Load dataset
-    df = pd.read_csv("nonclausal-np_features_encoded.csv")
+    df = pd.read_csv("rf_input.csv")
          
     # Step 1: Encode categorical features
     categorical_cols = ['dependent_upos', 'dependent_deprel', 'nominal_head_deprel', 
